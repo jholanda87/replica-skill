@@ -68,6 +68,12 @@
   ul.list li.A b { font-size: 15px; }
   ul.list li.C { opacity: .8; }
   .legend { background: #fff; padding: 8px 10px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 12px; line-height: 1.5; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #f1f5f9; color: #475569; margin-left: 6px; vertical-align: middle; font-weight: 600; }
+  .badge.on { background: #dcfce7; color: #166534; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  .sync-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .sync-box .erro { color: var(--danger); font-size: 12px; margin: 6px 0; }
+  .membro { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
   #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1d2733; color: #fff; padding: 8px 14px; border-radius: 6px; display: none; z-index: 2000; }
   .picking #map { cursor: crosshair; }
   table.bar { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -85,7 +91,7 @@
 <div id="app">
   <aside>
     <header>
-      <h1>Mapa de Clientes &middot; Fortaleza e RMF</h1>
+      <h1>Mapa de Clientes &middot; Fortaleza e RMF <span id="sync-badge" class="badge">Só neste aparelho</span></h1>
       <p>Água desmineralizada, aditivo para radiador e linha automotiva</p>
     </header>
     <nav class="tabs">
@@ -212,6 +218,9 @@
 
     <!-- Dados -->
     <section id="tab-dados" class="tab">
+      <h3 style="margin-top:0">Base compartilhada da equipe</h3>
+      <div id="sync-box" class="sync-box"></div>
+
       <h3>Prospecção automática (OpenStreetMap)</h3>
       <div class="hint">Busca no OpenStreetMap autopeças, postos, oficinas, auto elétricas, lava-jatos e supermercados na área visível do mapa e importa como <b>Potencial</b>. Aproxime o mapa da região que quer prospectar antes de buscar. Os dados do OSM são incompletos: confirme cada lead em campo.</div>
       <div class="checks" id="osm-tipos"></div>
@@ -241,7 +250,7 @@
         <button class="btn" id="btn-exp-json">Backup JSON</button>
         <label class="btn" style="margin:0; color:var(--ink)">Importar CSV/JSON<input type="file" id="file-imp" accept=".csv,.json" hidden></label>
       </div>
-      <p class="muted">Os dados ficam salvos neste navegador. Faça backup JSON com frequência e use-o para passar a base para outro computador ou vendedor.</p>
+      <p class="muted">Sem a base compartilhada, os dados ficam só neste navegador. Faça backup JSON com frequência.</p>
       <div class="btns"><button class="btn danger small" id="btn-zerar">Apagar todos os dados</button></div>
     </section>
   </aside>
@@ -309,10 +318,11 @@ function carregar() {
   if (!Array.isArray(d.status) || !d.status.length) d.status = STATUS_PADRAO.slice();
   return d;
 }
-function salvar() {
+function salvarLocal() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); }
   catch (e) { toast("Não foi possível salvar no navegador. Exporte um backup!"); }
 }
+function salvar() { salvarLocal(); enviar(); } // enviar() só age com a base compartilhada ligada
 
 // ---------- Utilidades ----------
 const $ = s => document.querySelector(s);
@@ -395,6 +405,7 @@ function popup(c) {
     ${c.endereco ? esc(c.endereco) + "<br>" : ""}
     Prioridade <b>${prio(c)}</b> (${score(c)} pts)${tags(c)}
     ${c.proximaAcao ? "Próxima: " + esc(c.proximaAcao) + (c.proximaData ? " em " + esc(c.proximaData.split("-").reverse().join("/")) : "") + "<br>" : ""}
+    ${c.atualizadoPor ? `<span class="muted">Atualizado por ${esc(c.atualizadoPor.split("@")[0])}${c.atualizado ? " em " + esc(c.atualizado.slice(0, 10).split("-").reverse().join("/")) : ""}</span>` : ""}
     <div class="btns">
       <button class="btn small" onclick="editar('${c.id}')">Editar</button>
       <button class="btn small" onclick="addRota('${c.id}')">+ Rota</button>
@@ -523,7 +534,7 @@ window.editar = function (id) {
 
 function renderHist(c) {
   $("#hist").innerHTML = (c.interacoes || []).slice().reverse().map(h =>
-    `<div class="hist"><b>${esc(h.data.split("-").reverse().join("/"))} &middot; ${esc(h.tipo)}</b><br>${esc(h.nota)}</div>`).join("") || `<p class="muted">Nenhum contato registrado.</p>`;
+    `<div class="hist"><b>${esc(h.data.split("-").reverse().join("/"))} &middot; ${esc(h.tipo)}</b>${h.autor ? ` <span class="muted">por ${esc(h.autor.split("@")[0])}</span>` : ""}<br>${esc(h.nota)}</div>`).join("") || `<p class="muted">Nenhum contato registrado.</p>`;
 }
 
 form.addEventListener("submit", e => {
@@ -566,7 +577,7 @@ form.status.addEventListener("change", toggleMotivo);
 $("#btn-hist").onclick = () => {
   const c = db.clientes.find(x => x.id === form.id.value); if (!c) return;
   const nota = $("#hist-nota").value.trim(); if (!nota) return;
-  (c.interacoes = c.interacoes || []).push({ data: hoje(), tipo: $("#hist-tipo").value, nota });
+  (c.interacoes = c.interacoes || []).push({ data: hoje(), tipo: $("#hist-tipo").value, nota, autor: sync.user ? sync.user.email : "" });
   c.atualizado = new Date().toISOString();
   $("#hist-nota").value = "";
   salvar(); renderHist(c); render();
@@ -803,9 +814,20 @@ $("#file-imp").onchange = async e => {
     if (f.name.endsWith(".json")) {
       const d = JSON.parse(txt);
       if (!Array.isArray(d.clientes)) throw new Error("formato");
-      if (!confirm(`Substituir a base atual (${db.clientes.length}) pelo backup (${d.clientes.length} clientes)?`)) return;
-      db = d; if (!db.status) db.status = STATUS_PADRAO.slice();
-      filtroStatus = new Set(db.status.map(s => s.id));
+      if (emSync()) { // base da equipe: só adiciona/atualiza, nunca apaga o que os outros cadastraram
+        if (!confirm(`Adicionar/atualizar ${d.clientes.length} clientes do backup na base da equipe?`)) return;
+        for (const c of d.clientes) {
+          if (!c || !c.nome) continue;
+          if (!idValido(c.id)) c.id = uid();
+          const i = db.clientes.findIndex(x => x.id === c.id);
+          i >= 0 ? db.clientes[i] = c : db.clientes.push(c);
+        }
+        (d.status || []).forEach(s => { if (!db.status.some(x => x.id === s.id)) { db.status.push(s); filtroStatus.add(s.id); } });
+      } else {
+        if (!confirm(`Substituir a base atual (${db.clientes.length}) pelo backup (${d.clientes.length} clientes)?`)) return;
+        db = d; if (!db.status) db.status = STATUS_PADRAO.slice();
+        filtroStatus = new Set(db.status.map(s => s.id));
+      }
     } else {
       let n = 0;
       for (const r of parseCSV(txt)) {
@@ -816,7 +838,7 @@ $("#file-imp").onchange = async e => {
         }
         const c = {
           ...Object.fromEntries(CAMPOS.map(k => [k, r[k] || ""])),
-          id: r.id && !db.clientes.some(x => x.id === r.id) ? r.id : uid(),
+          id: idValido(r.id) && !db.clientes.some(x => x.id === r.id) ? r.id : uid(),
           segmento: normId(r.segmento, SEGMENTOS) || "outro", status: stId || "potencial",
           lat: r.lat ? parseFloat(r.lat.replace(",", ".")) : "", lng: r.lng ? parseFloat(r.lng.replace(",", ".")) : "",
           produtos: r.produtos ? r.produtos.split("|").map(s => s.trim()).filter(Boolean) : [],
@@ -834,7 +856,9 @@ $("#file-imp").onchange = async e => {
   } catch (err) { toast("Arquivo inválido: " + err.message); }
 };
 $("#btn-zerar").onclick = () => {
-  if (!confirm("Apagar TODOS os clientes deste navegador? Faça um backup antes.")) return;
+  if (emSync() && !souDono()) return toast("Só o administrador da equipe pode apagar a base inteira.");
+  if (!confirm(emSync() ? "Apagar TODOS os clientes da base DA EQUIPE, para todos os vendedores? Faça um backup antes."
+    : "Apagar TODOS os clientes deste navegador? Faça um backup antes.")) return;
   if (!confirm("Tem certeza? Não dá para desfazer.")) return;
   db = { clientes: [], status: STATUS_PADRAO.slice(), base: db.base }; rota = [];
   salvar(); renderChips(); render(); renderRota();
@@ -890,6 +914,262 @@ $("#lista").addEventListener("click", e => {
 });
 $("#btn-novo").onclick = () => { limparForm(); abaAtiva("tab-form"); form.nome.focus(); };
 
+// ---------- Base compartilhada da equipe (Firebase) ----------
+// Sem configuração, o sistema funciona só neste aparelho. Com ela, cada
+// vendedor entra com a conta Google e todos veem a mesma base em tempo real.
+const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
+const KEY_CFG = KEY + ".firebase";
+const KEY_MODO = KEY + ".modo";
+const KEY_ANTES = KEY + ".antesDaBase"; // clientes que existiam só neste aparelho antes da base
+const GUIA = "https://github.com/jholanda87/replica-skill/blob/gh-pages/BASE_COMPARTILHADA.md";
+const sync = { user: null, fs: null, pronto: false, geralCarregado: false, ultimo: new Map(), geral: "",
+  parar: [], equipe: undefined, erro: "", carregando: false, offline: false };
+const emSync = () => !!(sync.user && sync.pronto);
+const emailAtual = () => (sync.user && sync.user.email || "").toLowerCase();
+const souDono = () => !!(sync.equipe && sync.equipe.dono === emailAtual());
+const idValido = id => typeof id === "string" && /^[\w-]{1,100}$/.test(id);
+
+function lerJSON(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+function gravarJSON(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ } }
+
+// aceita o trecho copiado do console do Firebase ("const firebaseConfig = { apiKey: ... }")
+function lerConfigColada(txt) {
+  const cfg = {};
+  for (const m of String(txt).matchAll(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g)) cfg[m[1]] = m[2];
+  return cfg.apiKey && cfg.projectId && cfg.appId && cfg.authDomain ? cfg : null;
+}
+const b64 = t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64 = t => decodeURIComponent(escape(atob(t.replace(/-/g, "+").replace(/_/g, "/"))));
+const linkConvite = () => location.origin + location.pathname + "#base=" + b64(JSON.stringify(lerJSON(KEY_CFG)));
+
+function carregarScript(src) {
+  return new Promise((ok, falha) => {
+    const el = document.createElement("script");
+    el.src = src; el.onload = ok; el.onerror = () => falha(new Error("falha ao carregar " + src));
+    document.head.appendChild(el);
+  });
+}
+
+function msgErro(e) {
+  const c = (e && e.code) || "";
+  if (c.includes("permission-denied")) return `O e-mail ${emailAtual()} ainda não foi liberado na equipe. Peça ao administrador para adicioná-lo.`;
+  if (c.includes("unauthorized-domain")) return `O endereço ${location.hostname} ainda não foi autorizado no Firebase (Authentication > Settings > Authorized domains).`;
+  if (c.includes("operation-not-allowed")) return "O login com Google ainda não foi ativado no Firebase (Authentication > Sign-in method > Google).";
+  if (c.includes("network") || c.includes("unavailable")) return "Sem internet. As alterações ficam guardadas e são enviadas quando a conexão voltar.";
+  return (e && e.message) || "Erro desconhecido";
+}
+
+async function iniciarSync() {
+  const cfg = lerJSON(KEY_CFG);
+  if (!cfg) return renderSync();
+  sync.carregando = true; renderSync();
+  try {
+    for (const f of ["firebase-app-compat.js", "firebase-auth-compat.js", "firebase-firestore-compat.js"]) await carregarScript(FB + f);
+  } catch (e) {
+    sync.carregando = false; sync.erro = "Não foi possível carregar a base (sem internet?). Mostrando os dados salvos neste aparelho.";
+    return renderSync();
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    sync.fs = firebase.firestore();
+    sync.fs.enablePersistence({ synchronizeTabs: true }).catch(() => { /* sem cache offline neste navegador */ });
+    firebase.auth().getRedirectResult().catch(e => { sync.erro = msgErro(e); renderSync(); });
+    firebase.auth().onAuthStateChanged(u => { sync.carregando = false; u ? conectar(u) : desconectar(); });
+  } catch (e) { sync.carregando = false; sync.erro = "Configuração do Firebase inválida: " + e.message; renderSync(); }
+}
+
+function conectar(u) {
+  sync.user = u; sync.erro = "";
+  // guarda os clientes que existiam só neste aparelho para o usuário decidir se envia
+  if (lerJSON(KEY_MODO) !== "base" && db.clientes.length && !lerJSON(KEY_ANTES)) gravarJSON(KEY_ANTES, db.clientes);
+  const fs = sync.fs;
+  assinarClientes();
+  sync.parar.push(fs.doc("equipe/acesso").onSnapshot(d => {
+    sync.equipe = d.exists ? d.data() : null;
+    // acabou de ser liberado (ou criou a equipe): volta a ouvir os clientes sem precisar sair e entrar
+    if (!sync.pronto && !sync.ouvindo && sync.equipe && (sync.equipe.emails || []).includes(emailAtual())) { sync.erro = ""; assinarClientes(); }
+    renderSync();
+  }, () => { sync.equipe = null; renderSync(); }));
+  renderSync();
+}
+
+function assinarClientes() { // clientes + status e fábrica da equipe
+  sync.ouvindo = true;
+  sync.parar.push(sync.fs.collection("clientes").onSnapshot({ includeMetadataChanges: true }, snap => {
+    const remotos = snap.docs.map(d => d.data());
+    db.clientes = remotos;
+    sync.ultimo = new Map(remotos.map(c => [c.id, JSON.stringify(c)]));
+    sync.offline = snap.metadata.fromCache; sync.pendente = snap.metadata.hasPendingWrites;
+    if (!sync.pronto) { sync.pronto = true; sync.erro = ""; gravarJSON(KEY_MODO, "base"); }
+    salvarLocal(); render(); renderRota(); renderSync();
+  }, e => { sync.ouvindo = false; sync.pronto = false; sync.erro = msgErro(e); renderSync(); }));
+  sync.parar.push(sync.fs.doc("config/geral").onSnapshot(d => {
+    const g = d.exists ? d.data() : null;
+    if (g && Array.isArray(g.status) && g.status.length) {
+      g.status.forEach(s => { if (!db.status.some(x => x.id === s.id)) filtroStatus.add(s.id); });
+      db.status = g.status;
+    }
+    if (g && "base" in g) db.base = g.base;
+    sync.geral = g ? JSON.stringify({ status: db.status, base: db.base || null }) : "";
+    sync.geralCarregado = true;
+    if (!g) enviar(); // primeira vez: leva os status e a fábrica deste aparelho
+    salvarLocal(); renderChips(); render(); desenharBase();
+  }, () => { /* sem acesso: a mensagem já vem da coleção de clientes */ }));
+}
+
+function desconectar() {
+  sync.parar.forEach(f => f()); sync.parar = [];
+  const estava = !!sync.user;
+  Object.assign(sync, { user: null, pronto: false, ouvindo: false, geralCarregado: false, ultimo: new Map(), geral: "", equipe: undefined });
+  if (estava) { db.clientes = []; salvarLocal(); render(); renderRota(); } // ao sair, os dados da equipe não ficam no aparelho
+  renderSync();
+}
+
+// Envia para a base só o que mudou desde a última versão recebida dela
+function enviar() {
+  if (!emSync()) return;
+  const fs = sync.fs, ops = [], ids = new Set();
+  for (const c of db.clientes) {
+    ids.add(c.id);
+    if (sync.ultimo.get(c.id) === JSON.stringify(c)) continue;
+    c.atualizadoPor = emailAtual();
+    const j = JSON.stringify(c);
+    sync.ultimo.set(c.id, j);
+    ops.push(b => b.set(fs.collection("clientes").doc(c.id), JSON.parse(j)));
+  }
+  for (const id of [...sync.ultimo.keys()]) if (!ids.has(id)) {
+    sync.ultimo.delete(id);
+    ops.push(b => b.delete(fs.collection("clientes").doc(id)));
+  }
+  if (sync.geralCarregado) {
+    const g = JSON.stringify({ status: db.status, base: db.base || null });
+    if (g !== sync.geral) { sync.geral = g; ops.push(b => b.set(fs.doc("config/geral"), JSON.parse(g))); }
+  }
+  for (let i = 0; i < ops.length; i += 400) { // limite de 500 operações por lote
+    const b = fs.batch(); ops.slice(i, i + 400).forEach(f => f(b));
+    b.commit().catch(e => toast("A base recusou a alteração: " + msgErro(e)));
+  }
+}
+
+async function entrar() {
+  const prov = new firebase.auth.GoogleAuthProvider();
+  prov.setCustomParameters({ prompt: "select_account" });
+  try { await firebase.auth().signInWithPopup(prov); }
+  catch (e) {
+    if (/popup-blocked|operation-not-supported/.test(e.code)) return firebase.auth().signInWithRedirect(prov);
+    if (!/popup-closed-by-user|cancelled-popup-request/.test(e.code)) { sync.erro = msgErro(e); renderSync(); }
+  }
+}
+
+function antesNaoEnviados() {
+  const antes = lerJSON(KEY_ANTES);
+  if (!Array.isArray(antes) || !emSync()) return [];
+  const ids = new Set(db.clientes.map(c => c.id));
+  return antes.filter(c => c && c.nome && !ids.has(c.id));
+}
+
+function renderSync() {
+  const box = $("#sync-box"), badge = $("#sync-badge");
+  if (!box) return;
+  const cfg = lerJSON(KEY_CFG);
+  badge.className = "badge" + (emSync() ? (sync.offline ? " warn" : " on") : "");
+  badge.textContent = emSync() ? (sync.offline ? "Equipe · sem internet" : "Equipe · sincronizado") : cfg ? "Equipe · desconectado" : "Só neste aparelho";
+  const erro = sync.erro ? `<div class="erro">${esc(sync.erro)}</div>` : "";
+  const guia = `<a href="${GUIA}" target="_blank" rel="noopener">guia passo a passo</a>`;
+
+  if (!cfg) {
+    box.innerHTML = `<p class="muted" style="margin-top:0">Hoje os dados ficam só neste aparelho. Para toda a equipe ver e editar a mesma base em tempo real, crie um projeto gratuito no Firebase (siga o ${guia}) e cole aqui a configuração dele.</p>
+      <textarea id="cfg-txt" placeholder="const firebaseConfig = { apiKey: ..., authDomain: ..., projectId: ..., appId: ... }"></textarea>
+      ${erro}<div class="btns"><button class="btn primary" data-acao="cfg">Conectar à base</button></div>`;
+    return;
+  }
+  if (sync.carregando) { box.innerHTML = `<p class="muted" style="margin:0">Conectando à base da equipe...</p>`; return; }
+  if (!sync.user) {
+    box.innerHTML = `<p class="muted" style="margin-top:0">Base da equipe configurada (projeto <b>${esc(cfg.projectId)}</b>). Entre com a sua conta Google para ver e editar os clientes.</p>
+      ${erro}<div class="btns"><button class="btn primary" data-acao="entrar"${window.firebase ? "" : " disabled"}>Entrar com Google</button>
+      <button class="btn small danger" data-acao="rmcfg">Desligar base deste aparelho</button></div>`;
+    return;
+  }
+  const email = emailAtual();
+  let h = `<div><b>${esc(email)}</b></div>`;
+  if (!sync.pronto) {
+    h += erro || `<p class="muted">Carregando clientes...</p>`;
+  } else {
+    h += `<p class="muted" style="margin:4px 0">${db.clientes.length} clientes na base da equipe${sync.pendente ? " · enviando alterações..." : ""}${sync.offline ? " · sem internet: as alterações serão enviadas quando a conexão voltar" : ""}</p>${erro}`;
+    const antes = antesNaoEnviados();
+    if (antes.length) h += `<div class="hint">Este aparelho tem <b>${antes.length}</b> clientes cadastrados antes da base da equipe.
+      <div class="btns"><button class="btn small primary" data-acao="enviar-antes">Enviar para a base</button><button class="btn small" data-acao="descartar-antes">Não enviar</button></div></div>`;
+  }
+  // equipe
+  if (sync.equipe === null && sync.user) {
+    h += `<h3>Equipe</h3><p class="muted">A equipe ainda não foi criada. Quem criar vira o administrador e decide quem tem acesso.</p>
+      <div class="btns"><button class="btn small primary" data-acao="criar-equipe">Criar equipe (sou o administrador)</button></div>`;
+  } else if (sync.equipe) {
+    const emails = sync.equipe.emails || [];
+    h += `<h3>Equipe (${emails.length})</h3>` + emails.map(e => `<div class="membro"><span>${esc(e)}${e === sync.equipe.dono ? ' <span class="muted">administrador</span>' : ""}</span>
+      ${souDono() && e !== sync.equipe.dono ? `<button class="btn small danger" data-acao="rm-membro" data-email="${esc(e)}">remover</button>` : ""}</div>`).join("");
+    if (souDono()) h += `<div style="display:flex; gap:6px; margin-top:8px"><input id="novo-membro" type="email" placeholder="email.do.vendedor@gmail.com"><button class="btn small" data-acao="add-membro">Liberar</button></div>`;
+    if (souDono() || emails.includes(email)) {
+      const link = linkConvite();
+      h += `<h3>Convidar</h3><p class="muted" style="margin:0 0 4px">Libere o e-mail acima e envie este link. Quem abrir já fica com a base configurada e só precisa entrar com o Google.</p>
+        <input id="link-convite" readonly value="${esc(link)}">
+        <div class="btns"><button class="btn small" data-acao="copiar">Copiar link</button>
+        <a class="btn small" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Acesse o mapa de clientes e entre com sua conta Google: " + link)}">Enviar por WhatsApp</a></div>`;
+    }
+  }
+  h += `<div class="btns"><button class="btn small" data-acao="sair">Sair</button></div>`;
+  box.innerHTML = h;
+}
+
+$("#sync-box").addEventListener("click", async e => {
+  const el = e.target.closest("[data-acao]"); if (!el) return;
+  const acao = el.dataset.acao, fs = sync.fs;
+  try {
+    if (acao === "cfg") {
+      const cfg = lerConfigColada($("#cfg-txt").value);
+      if (!cfg) { sync.erro = "Não reconheci a configuração. Copie o bloco inteiro do Firebase, com apiKey, authDomain, projectId e appId."; return renderSync(); }
+      gravarJSON(KEY_CFG, cfg); sync.erro = ""; iniciarSync();
+    } else if (acao === "entrar") entrar();
+    else if (acao === "sair") { await firebase.auth().signOut(); toast("Você saiu da base da equipe"); }
+    else if (acao === "rmcfg") {
+      if (!confirm("Desligar a base da equipe neste aparelho? Os dados continuam salvos na base.")) return;
+      gravarJSON(KEY_CFG, null); gravarJSON(KEY_MODO, null); location.reload();
+    } else if (acao === "enviar-antes") {
+      const antes = antesNaoEnviados();
+      db.clientes.push(...antes); gravarJSON(KEY_ANTES, null);
+      salvar(); render(); toast(`${antes.length} clientes enviados para a base`);
+    } else if (acao === "descartar-antes") {
+      if (!confirm("Não enviar esses clientes? Eles serão apagados deste aparelho.")) return;
+      gravarJSON(KEY_ANTES, null); renderSync();
+    } else if (acao === "criar-equipe") {
+      await fs.doc("equipe/acesso").set({ dono: emailAtual(), emails: [emailAtual()] });
+      toast("Equipe criada. Você é o administrador.");
+    } else if (acao === "add-membro") {
+      const novo = $("#novo-membro").value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(novo)) return toast("Digite um e-mail válido");
+      const emails = [...new Set([...(sync.equipe.emails || []), novo])];
+      await fs.doc("equipe/acesso").set({ dono: sync.equipe.dono, emails });
+      toast(novo + " liberado");
+    } else if (acao === "rm-membro") {
+      if (!confirm(`Remover o acesso de ${el.dataset.email}?`)) return;
+      await fs.doc("equipe/acesso").set({ dono: sync.equipe.dono, emails: (sync.equipe.emails || []).filter(x => x !== el.dataset.email) });
+    } else if (acao === "copiar") {
+      const inp = $("#link-convite");
+      try { await navigator.clipboard.writeText(inp.value); toast("Link copiado"); }
+      catch (err) { inp.select(); toast("Selecionei o link: copie com Ctrl+C"); }
+    }
+  } catch (err) { toast(msgErro(err)); }
+});
+
+// link de convite: #base=... configura este aparelho e some do endereço
+if (location.hash.startsWith("#base=")) {
+  try {
+    const cfg = JSON.parse(unb64(location.hash.slice(6)));
+    if (cfg && cfg.apiKey && cfg.projectId) { gravarJSON(KEY_CFG, cfg); setTimeout(() => { abaAtiva("tab-dados"); toast("Base da equipe configurada. Entre com sua conta Google."); }, 50); }
+  } catch (e) { /* link inválido */ }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+
 // ---------- Inicialização ----------
 $("#sel-seg").innerHTML = SEGMENTOS.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join("");
 $("#sel-motivo").innerHTML = MOTIVOS.map(m => `<option>${esc(m)}</option>`).join("");
@@ -897,7 +1177,8 @@ $("#produtos").innerHTML = PRODUTOS.map(p => `<label><input type="checkbox" valu
 $("#osm-tipos").innerHTML = OSM_TIPOS.map((t, i) => `<label><input type="checkbox" value="${i}" checked> ${esc(t.rotulo)}</label>`).join("");
 $("#rota-data").value = hoje();
 renderChips(); render(); renderRota(); desenharBase();
-if (!db.clientes.length) toast("Comece em Dados > Prospecção automática, ou clique com o botão direito no mapa para cadastrar.");
+iniciarSync();
+if (!db.clientes.length && !lerJSON(KEY_CFG)) toast("Comece em Dados > Prospecção automática, ou clique com o botão direito no mapa para cadastrar.");
 </script>
 </body>
 </html>

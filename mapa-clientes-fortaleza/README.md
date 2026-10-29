@@ -51,6 +51,11 @@ cliente e use "Localizar" ou "Marcar ponto no mapa".
 
 ## Onde ficam os dados
 
-No armazenamento local do navegador (`localStorage`). Cada navegador tem a sua
-base. Use **Dados > Backup JSON** para guardar ou passar a base para outra
-pessoa, e **Importar** para carregá-la.
+Sem configuração, no armazenamento do navegador (`localStorage`): cada navegador
+tem a sua base. Use **Dados > Backup JSON** para guardar ou passar a base para
+outra pessoa.
+
+Com a **base compartilhada da equipe** ligada, os clientes ficam no Firebase
+(Google) e todos os vendedores liberados veem e editam a mesma base em tempo
+real, cada um com a própria conta Google. Como ligar:
+[`BASE_COMPARTILHADA.md`](BASE_COMPARTILHADA.md).
