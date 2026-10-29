@@ -31,7 +31,11 @@ menus podem aparecer em português ou em inglês; os dois estão indicados.
 ## 3. Colar as regras de segurança
 
 Ainda no Firestore, abra a aba **Regras** (*Rules*), apague tudo o que estiver
-lá, cole o texto abaixo e clique em **Publicar** (*Publish*).
+lá, cole **somente o código** abaixo (sem os textos deste guia) e clique em
+**Publicar** (*Publish*). A primeira linha tem que ser `rules_version = '2';`.
+
+Para copiar só o código, abra
+<https://jholanda87.github.io/replica-skill/firestore.rules>, use Ctrl+A e Ctrl+C.
 
 ```
 rules_version = '2';
