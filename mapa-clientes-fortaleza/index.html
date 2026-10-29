@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de Clientes Fortaleza</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root {
+    --bg: #f5f7fa; --panel: #ffffff; --ink: #1d2733; --muted: #64748b;
+    --line: #e2e8f0; --brand: #0e7490; --brand-ink: #ffffff; --danger: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  #app { display: grid; grid-template-columns: 380px 1fr; height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  header { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 0 2px; }
+  header p { margin: 0; color: var(--muted); font-size: 12px; }
+  nav.tabs { display: flex; border-bottom: 1px solid var(--line); }
+  nav.tabs button { flex: 1; border: 0; background: none; padding: 9px 4px; cursor: pointer; font: inherit; color: var(--muted); border-bottom: 2px solid transparent; }
+  nav.tabs button.on { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+  .tab { display: none; overflow: auto; padding: 12px 14px; flex: 1; min-height: 0; }
+  .tab.on { display: block; }
+  #map { height: 100vh; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input, select, textarea { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; background: #fff; color: var(--ink); }
+  textarea { min-height: 60px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn { border: 1px solid var(--line); background: #fff; padding: 7px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+  .btn.danger { color: var(--danger); }
+  .btn.small { padding: 4px 8px; font-size: 12px; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; cursor: pointer; user-select: none; background: #fff; }
+  .chip.off { opacity: .4; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  ul.list { list-style: none; padding: 0; margin: 8px 0 0; }
+  ul.list li { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 6px; cursor: pointer; }
+  ul.list li:hover { border-color: var(--brand); }
+  .li-top { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .prio { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; color: #fff; }
+  .prio.A { background: #15803d; } .prio.B { background: #ca8a04; } .prio.C { background: #64748b; }
+  h3 { font-size: 13px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+  .hint { background: #ecfeff; border: 1px solid #a5f3fc; padding: 8px; border-radius: 6px; font-size: 12px; margin: 8px 0; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+  .checks label { display: flex; gap: 6px; align-items: center; margin: 2px 0; color: var(--ink); font-size: 13px; }
+  .checks input { width: auto; }
+  .hist { border-left: 2px solid var(--line); padding-left: 8px; margin: 4px 0; font-size: 12px; }
+  .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; }
+  .pin span { transform: rotate(45deg); color: #fff; font-weight: 700; font-size: 11px; }
+  .legend { background: #fff; padding: 8px 10px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 12px; line-height: 1.5; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1d2733; color: #fff; padding: 8px 14px; border-radius: 6px; display: none; z-index: 2000; }
+  .picking #map { cursor: crosshair; }
+  table.bar { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.bar td { padding: 2px 0; }
+  .barfill { height: 8px; background: var(--brand); border-radius: 4px; }
+  @media (max-width: 800px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 55vh 45vh; }
+    #map { height: 55vh; grid-row: 1; }
+    aside { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); }
+    .legend { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <header>
+      <h1>Mapa de Clientes &middot; Fortaleza e RMF</h1>
+      <p>Água desmineralizada, aditivo para radiador e linha automotiva</p>
+    </header>
+    <nav class="tabs">
+      <button data-tab="tab-mapa" class="on">Clientes</button>
+      <button data-tab="tab-form">Cadastro</button>
+      <button data-tab="tab-rota">Rota</button>
+      <button data-tab="tab-dados">Dados</button>
+    </nav>
+
+    <!-- Lista e filtros -->
+    <section id="tab-mapa" class="tab on">
+      <div class="stats" id="stats"></div>
+      <input id="q" placeholder="Buscar por nome, bairro, rede, contato...">
+      <h3>Status</h3>
+      <div class="chips" id="f-status"></div>
+      <h3>Segmento</h3>
+      <div class="chips" id="f-seg"></div>
+      <div class="row">
+        <div><label>Cidade</label><select id="f-cidade"><option value="">Todas</option></select></div>
+        <div><label>Prioridade</label><select id="f-prio"><option value="">Todas</option><option>A</option><option>B</option><option>C</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Ordenar por</label><select id="f-ord"><option value="score">Prioridade</option><option value="proxima">Próxima ação</option><option value="nome">Nome</option><option value="atualizado">Atualização</option></select></div>
+        <div><label>&nbsp;</label><button class="btn" id="btn-novo" style="width:100%">+ Novo cliente</button></div>
+      </div>
+      <p class="muted" id="count"></p>
+      <ul class="list" id="lista"></ul>
+    </section>
+
+    <!-- Formulário -->
+    <section id="tab-form" class="tab">
+      <form id="form" autocomplete="off">
+        <input type="hidden" name="id">
+        <label>Nome do estabelecimento *</label>
+        <input name="nome" required>
+        <div class="row">
+          <div><label>Segmento</label><select name="segmento" id="sel-seg"></select></div>
+          <div><label>Status</label><select name="status" id="sel-status"></select></div>
+        </div>
+        <div id="box-motivo" style="display:none">
+          <label>Motivo do descarte</label>
+          <select name="motivo" id="sel-motivo"></select>
+        </div>
+        <label>Rede / grupo (se fizer parte de uma)</label>
+        <input name="rede" placeholder="Ex.: rede de postos, rede de supermercados">
+        <label>Endereço</label>
+        <div style="display:flex; gap:6px">
+          <input name="endereco" id="endereco" placeholder="Rua, número, bairro">
+          <button type="button" class="btn small" id="btn-geo" title="Localizar endereço no mapa">Localizar</button>
+        </div>
+        <div class="row">
+          <div><label>Bairro</label><input name="bairro"></div>
+          <div><label>Cidade</label><input name="cidade" value="Fortaleza"></div>
+        </div>
+        <div class="row">
+          <div><label>Latitude</label><input name="lat" inputmode="decimal"></div>
+          <div><label>Longitude</label><input name="lng" inputmode="decimal"></div>
+        </div>
+        <div class="btns"><button type="button" class="btn small" id="btn-pick">Marcar ponto no mapa</button></div>
+        <div class="row">
+          <div><label>Contato (comprador)</label><input name="contato"></div>
+          <div><label>Telefone / WhatsApp</label><input name="telefone" inputmode="tel"></div>
+        </div>
+        <h3>Produtos de interesse / que já compra</h3>
+        <div class="checks" id="produtos"></div>
+        <div class="row">
+          <div><label>Potencial (R$ / mês)</label><input name="potencial" inputmode="numeric" placeholder="0"></div>
+          <div><label>Concorrente atual</label><input name="concorrente"></div>
+        </div>
+        <div class="row">
+          <div><label>Próxima ação</label><input name="proximaAcao" placeholder="Visita, amostra, proposta..."></div>
+          <div><label>Data</label><input type="date" name="proximaData"></div>
+        </div>
+        <label>Observações</label>
+        <textarea name="obs"></textarea>
+        <div id="box-hist" style="display:none">
+          <h3>Histórico de contatos</h3>
+          <div class="row">
+            <div><select id="hist-tipo"><option>Visita</option><option>Ligação</option><option>WhatsApp</option><option>Amostra entregue</option><option>Proposta</option><option>Pedido</option><option>Reclamação</option></select></div>
+            <div><input id="hist-nota" placeholder="O que aconteceu?"></div>
+          </div>
+          <div class="btns"><button type="button" class="btn small" id="btn-hist">Registrar contato</button></div>
+          <div id="hist"></div>
+        </div>
+        <div class="btns">
+          <button class="btn primary" type="submit">Salvar</button>
+          <button class="btn" type="button" id="btn-cancel">Limpar</button>
+          <button class="btn danger" type="button" id="btn-del" style="display:none">Excluir</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Rota -->
+    <section id="tab-rota" class="tab">
+      <div class="hint">Monte a rota de visitas do dia: escolha os clientes (ou use os agendados para a data), defina o ponto de partida e o sistema ordena pelo caminho mais curto aproximado. Depois abra no Google Maps.</div>
+      <div class="row">
+        <div><label>Data das visitas</label><input type="date" id="rota-data"></div>
+        <div><label>Máx. de paradas</label><input type="number" id="rota-max" value="10" min="2" max="25"></div>
+      </div>
+      <label>Ponto de partida</label>
+      <select id="rota-inicio">
+        <option value="fabrica">Fábrica / depósito (definir em Dados)</option>
+        <option value="gps">Minha localização atual</option>
+      </select>
+      <div class="btns">
+        <button class="btn" id="rota-agendados">Usar agendados da data</button>
+        <button class="btn" id="rota-filtro">Usar prioridade A do filtro atual</button>
+      </div>
+      <h3>Paradas</h3>
+      <ol id="rota-lista" class="muted"></ol>
+      <div class="btns">
+        <button class="btn primary" id="rota-ordenar">Otimizar ordem</button>
+        <button class="btn" id="rota-gmaps">Abrir no Google Maps</button>
+        <button class="btn" id="rota-limpar">Limpar</button>
+      </div>
+      <p class="muted" id="rota-info"></p>
+    </section>
+
+    <!-- Dados -->
+    <section id="tab-dados" class="tab">
+      <h3>Prospecção automática (OpenStreetMap)</h3>
+      <div class="hint">Busca no OpenStreetMap autopeças, postos, oficinas, auto elétricas, lava-jatos e supermercados na área visível do mapa e importa como <b>Potencial</b>. Aproxime o mapa da região que quer prospectar antes de buscar. Os dados do OSM são incompletos: confirme cada lead em campo.</div>
+      <div class="checks" id="osm-tipos"></div>
+      <div class="btns"><button class="btn primary" id="btn-osm">Buscar na área visível</button></div>
+      <p class="muted" id="osm-info"></p>
+
+      <h3>Resumo por segmento</h3>
+      <div id="resumo"></div>
+
+      <h3>Fábrica / depósito</h3>
+      <div class="row">
+        <div><label>Latitude</label><input id="base-lat"></div>
+        <div><label>Longitude</label><input id="base-lng"></div>
+      </div>
+      <div class="btns"><button class="btn small" id="btn-base-pick">Marcar no mapa</button><button class="btn small" id="btn-base-save">Salvar</button></div>
+
+      <h3>Tipos de status</h3>
+      <div id="status-edit"></div>
+      <div class="row">
+        <div><input id="novo-status" placeholder="Novo status (ex.: Inadimplente)"></div>
+        <div style="display:flex; gap:6px"><input type="color" id="novo-status-cor" value="#7c3aed" style="width:50px; padding:2px"><button class="btn small" id="btn-add-status">Adicionar</button></div>
+      </div>
+
+      <h3>Importar / exportar</h3>
+      <div class="btns">
+        <button class="btn" id="btn-exp-csv">Exportar CSV (Excel)</button>
+        <button class="btn" id="btn-exp-json">Backup JSON</button>
+        <label class="btn" style="margin:0; color:var(--ink)">Importar CSV/JSON<input type="file" id="file-imp" accept=".csv,.json" hidden></label>
+      </div>
+      <p class="muted">Os dados ficam salvos neste navegador. Faça backup JSON com frequência e use-o para passar a base para outro computador ou vendedor.</p>
+      <div class="btns"><button class="btn danger small" id="btn-zerar">Apagar todos os dados</button></div>
+    </section>
+  </aside>
+  <div id="map"></div>
+</div>
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+"use strict";
+
+// ---------- Configuração ----------
+const FORTALEZA = [-3.7319, -38.5267];
+const KEY = "mapaClientesFortaleza.v1";
+
+const SEGMENTOS = [
+  { id: "autopecas",   nome: "Loja de autopeças",      letra: "A", peso: 30 },
+  { id: "posto",       nome: "Posto de combustível",   letra: "P", peso: 25 },
+  { id: "oficina",     nome: "Oficina mecânica",       letra: "O", peso: 20 },
+  { id: "supermercado",nome: "Supermercado / rede",    letra: "S", peso: 30 },
+  { id: "autoeletrica",nome: "Auto elétrica / baterias",letra: "E", peso: 22 },
+  { id: "lavajato",    nome: "Lava-jato / estética",   letra: "L", peso: 12 },
+  { id: "distribuidor",nome: "Distribuidor / atacado", letra: "D", peso: 35 },
+  { id: "frota",       nome: "Frota / transportadora", letra: "F", peso: 25 },
+  { id: "outro",       nome: "Outro",                  letra: "?", peso: 10 }
+];
+
+const STATUS_PADRAO = [
+  { id: "potencial",   nome: "Potencial",                 cor: "#2563eb", peso: 20 },
+  { id: "negociacao",  nome: "Em negociação",             cor: "#f59e0b", peso: 30 },
+  { id: "ativo",       nome: "Ativo (não fidelizado)",    cor: "#a855f7", peso: 25 },
+  { id: "fidelizado",  nome: "Fidelizado",                cor: "#16a34a", peso: 10 },
+  { id: "descartado",  nome: "Descartado",                cor: "#6b7280", peso: -40 }
+];
+
+const MOTIVOS = ["Preço", "Fornecedor exclusivo / contrato", "Não trabalha com o produto", "Baixo volume",
+  "Inadimplência / crédito", "Estabelecimento fechou", "Fora da área de entrega", "Sem interesse do dono", "Outro"];
+
+const PRODUTOS = ["Água desmineralizada", "Aditivo radiador concentrado", "Aditivo radiador pronto uso",
+  "Arla 32", "Fluido de freio", "Limpa para-brisa", "Shampoo automotivo", "Outros"];
+
+const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+
+const OSM_TIPOS = [
+  { seg: "autopecas",    rotulo: "Autopeças",      filtros: ['["shop"="car_parts"]'] },
+  { seg: "posto",        rotulo: "Postos",         filtros: ['["amenity"="fuel"]'] },
+  { seg: "oficina",      rotulo: "Oficinas",       filtros: ['["shop"="car_repair"]', '["craft"="car_repair"]'] },
+  { seg: "autoeletrica", rotulo: "Baterias / auto elétrica", filtros: ['["shop"="car_repair"]["car_repair"~"electrical|battery"]', '["shop"="batteries"]'] },
+  { seg: "lavajato",     rotulo: "Lava-jatos",     filtros: ['["amenity"="car_wash"]'] },
+  { seg: "supermercado", rotulo: "Supermercados",  filtros: ['["shop"="supermarket"]', '["shop"="wholesale"]'] }
+];
+
+// ---------- Estado ----------
+let db = carregar();
+let filtroStatus = new Set(db.status.map(s => s.id));
+let filtroSeg = new Set(SEGMENTOS.map(s => s.id));
+let rota = [];
+let modoPick = null; // "cliente" | "base"
+
+function carregar() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) { d = null; }
+  if (!d || !Array.isArray(d.clientes)) d = { clientes: [], status: STATUS_PADRAO.slice(), base: null };
+  if (!Array.isArray(d.status) || !d.status.length) d.status = STATUS_PADRAO.slice();
+  return d;
+}
+function salvar() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch (e) { toast("Não foi possível salvar no navegador. Exporte um backup!"); }
+}
+
+// ---------- Utilidades ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const hoje = () => new Date().toISOString().slice(0, 10);
+const seg = id => SEGMENTOS.find(s => s.id === id) || SEGMENTOS[SEGMENTOS.length - 1];
+const st = id => db.status.find(s => s.id === id) || { id, nome: id, cor: "#334155", peso: 0 };
+const brl = n => (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = "none", 3500); }
+function distKm(a, b) {
+  const R = 6371, r = x => x * Math.PI / 180;
+  const dLat = r(b[0] - a[0]), dLng = r(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const temGeo = c => isFinite(parseFloat(c.lat)) && isFinite(parseFloat(c.lng));
+
+// Pontuação de prioridade: segmento + potencial + status + rede + agenda
+function score(c) {
+  let s = seg(c.segmento).peso + st(c.status).peso;
+  s += Math.min(30, (Number(c.potencial) || 0) / 100);   // até 30 pts (R$ 3.000/mês)
+  if (c.rede) s += 10;                                    // redes multiplicam o pedido
+  if (c.proximaData && c.proximaData <= hoje()) s += 10;  // ação vencida ou do dia
+  if (c.status === "descartado") s = Math.min(s, 5);
+  return Math.round(s);
+}
+const prio = c => { const s = score(c); return s >= 60 ? "A" : s >= 40 ? "B" : "C"; };
+
+// ---------- Mapa ----------
+const map = L.map("map", { zoomControl: true }).setView(FORTALEZA, 12);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "&copy; colaboradores do OpenStreetMap"
+}).addTo(map);
+const cluster = L.markerClusterGroup({ maxClusterRadius: 40, disableClusteringAtZoom: 16 });
+map.addLayer(cluster);
+const rotaLayer = L.layerGroup().addTo(map);
+let baseMarker = null;
+
+const legenda = L.control({ position: "bottomright" });
+legenda.onAdd = () => { const d = L.DomUtil.create("div", "legend"); d.id = "legenda"; return d; };
+legenda.addTo(map);
+
+function icone(c) {
+  const s = st(c.status);
+  return L.divIcon({
+    className: "", iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24],
+    html: `<div class="pin" style="background:${s.cor}"><span>${esc(seg(c.segmento).letra)}</span></div>`
+  });
+}
+
+function popup(c) {
+  const s = st(c.status);
+  const tel = (c.telefone || "").replace(/\D/g, "");
+  return `<b>${esc(c.nome)}</b><br>
+    <span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)}${c.status === "descartado" && c.motivo ? " &middot; " + esc(c.motivo) : ""}<br>
+    ${esc(seg(c.segmento).nome)}${c.rede ? " &middot; Rede: " + esc(c.rede) : ""}<br>
+    ${c.endereco ? esc(c.endereco) + "<br>" : ""}
+    Prioridade <b>${prio(c)}</b> (${score(c)} pts)${c.potencial ? " &middot; " + brl(c.potencial) + "/mês" : ""}<br>
+    ${c.proximaAcao ? "Próxima: " + esc(c.proximaAcao) + (c.proximaData ? " em " + esc(c.proximaData.split("-").reverse().join("/")) : "") + "<br>" : ""}
+    <div class="btns">
+      <button class="btn small" onclick="editar('${c.id}')">Editar</button>
+      <button class="btn small" onclick="addRota('${c.id}')">+ Rota</button>
+      ${tel ? `<a class="btn small" target="_blank" rel="noopener" href="https://wa.me/55${tel.replace(/^55/, "")}">WhatsApp</a>` : ""}
+    </div>`;
+}
+
+// ---------- Filtros e lista ----------
+function filtrados() {
+  const q = $("#q").value.trim().toLowerCase();
+  const cid = $("#f-cidade").value, pr = $("#f-prio").value;
+  return db.clientes.filter(c =>
+    filtroStatus.has(c.status) && filtroSeg.has(c.segmento) &&
+    (!cid || (c.cidade || "") === cid) && (!pr || prio(c) === pr) &&
+    (!q || [c.nome, c.bairro, c.rede, c.contato, c.endereco, c.obs, c.concorrente].join(" ").toLowerCase().includes(q)));
+}
+
+function render() {
+  const lista = filtrados();
+  const ord = $("#f-ord").value;
+  lista.sort((a, b) =>
+    ord === "nome" ? a.nome.localeCompare(b.nome) :
+    ord === "proxima" ? (a.proximaData || "9999").localeCompare(b.proximaData || "9999") :
+    ord === "atualizado" ? (b.atualizado || "").localeCompare(a.atualizado || "") :
+    score(b) - score(a));
+
+  cluster.clearLayers();
+  lista.filter(temGeo).forEach(c => {
+    L.marker([+c.lat, +c.lng], { icon: icone(c) }).bindPopup(() => popup(c)).addTo(cluster);
+  });
+
+  const ul = $("#lista");
+  ul.innerHTML = lista.slice(0, 300).map(c => {
+    const s = st(c.status);
+    const atrasado = c.proximaData && c.proximaData < hoje() && c.status !== "descartado";
+    return `<li data-id="${c.id}">
+      <div class="li-top"><b>${esc(c.nome)}</b><span class="prio ${prio(c)}">${prio(c)}</span></div>
+      <div class="muted"><span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)} &middot; ${esc(seg(c.segmento).nome)}${c.bairro ? " &middot; " + esc(c.bairro) : ""}</div>
+      ${c.proximaAcao ? `<div class="muted" style="${atrasado ? "color:#b91c1c" : ""}">${atrasado ? "Atrasado: " : ""}${esc(c.proximaAcao)} ${c.proximaData ? esc(c.proximaData.split("-").reverse().join("/")) : ""}</div>` : ""}
+      ${temGeo(c) ? "" : `<div class="muted" style="color:#b91c1c">Sem localização no mapa</div>`}
+    </li>`;
+  }).join("");
+  $("#count").textContent = `${lista.length} de ${db.clientes.length} clientes${lista.length > 300 ? " (mostrando 300)" : ""}`;
+
+  // indicadores
+  const conta = id => db.clientes.filter(c => c.status === id).length;
+  const ativos = db.clientes.filter(c => c.status === "fidelizado" || c.status === "ativo");
+  const atrasados = db.clientes.filter(c => c.proximaData && c.proximaData < hoje() && c.status !== "descartado").length;
+  $("#stats").innerHTML = [
+    [db.clientes.length, "na base"], [conta("potencial") + conta("negociacao"), "em prospecção"],
+    [conta("fidelizado"), "fidelizados"], [conta("ativo"), "ativos não fidel."],
+    [brl(ativos.reduce((t, c) => t + (Number(c.potencial) || 0), 0)), "carteira/mês"], [atrasados, "ações atrasadas"]
+  ].map(([n, t]) => `<div class="stat"><b>${n}</b><span>${t}</span></div>`).join("");
+
+  $("#legenda").innerHTML = db.status.map(s => `<div><span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)} (${conta(s.id)})</div>`).join("");
+
+  const cidades = [...new Set(db.clientes.map(c => c.cidade).filter(Boolean))].sort();
+  const sel = $("#f-cidade"), atual = sel.value;
+  sel.innerHTML = `<option value="">Todas</option>` + cidades.map(c => `<option ${c === atual ? "selected" : ""}>${esc(c)}</option>`).join("");
+
+  renderResumo();
+}
+
+function renderChips() {
+  $("#f-status").innerHTML = db.status.map(s =>
+    `<span class="chip ${filtroStatus.has(s.id) ? "" : "off"}" data-st="${s.id}"><span class="dot" style="background:${s.cor}"></span>${esc(s.nome)}</span>`).join("");
+  $("#f-seg").innerHTML = SEGMENTOS.map(s =>
+    `<span class="chip ${filtroSeg.has(s.id) ? "" : "off"}" data-seg="${s.id}"><b>${s.letra}</b> ${esc(s.nome)}</span>`).join("");
+  $("#sel-status").innerHTML = db.status.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join("");
+  $("#status-edit").innerHTML = db.status.map(s =>
+    `<div style="display:flex; gap:6px; align-items:center; margin:3px 0">
+      <input type="color" value="${s.cor}" data-cor="${s.id}" style="width:40px; padding:1px">
+      <span style="flex:1">${esc(s.nome)}</span>
+      ${STATUS_PADRAO.some(p => p.id === s.id) ? "" : `<button class="btn small danger" data-rm="${s.id}">remover</button>`}
+    </div>`).join("");
+}
+
+function renderResumo() {
+  const linhas = SEGMENTOS.map(s => {
+    const cs = db.clientes.filter(c => c.segmento === s.id);
+    const fid = cs.filter(c => c.status === "fidelizado").length;
+    return { s, total: cs.length, fid };
+  }).filter(l => l.total);
+  const max = Math.max(1, ...linhas.map(l => l.total));
+  $("#resumo").innerHTML = linhas.length ? `<table class="bar">${linhas.map(l =>
+    `<tr><td style="width:45%">${esc(l.s.nome)}</td><td><div class="barfill" style="width:${l.total / max * 100}%"></div></td>
+     <td style="width:70px; text-align:right">${l.fid}/${l.total} fid.</td></tr>`).join("")}</table>`
+    : `<p class="muted">Nenhum cliente cadastrado ainda.</p>`;
+}
+
+// ---------- Formulário ----------
+const form = $("#form");
+function abaAtiva(id) {
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id));
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.id === id));
+}
+function limparForm(dados) {
+  form.reset();
+  form.id.value = "";
+  form.cidade.value = "Fortaleza";
+  document.querySelectorAll("#produtos input").forEach(i => i.checked = false);
+  $("#btn-del").style.display = "none";
+  $("#box-hist").style.display = "none";
+  if (dados) Object.entries(dados).forEach(([k, v]) => { if (form[k] && typeof v !== "object") form[k].value = v; });
+  toggleMotivo();
+}
+function toggleMotivo() { $("#box-motivo").style.display = form.status.value === "descartado" ? "block" : "none"; }
+
+window.editar = function (id) {
+  const c = db.clientes.find(x => x.id === id); if (!c) return;
+  limparForm();
+  Object.keys(c).forEach(k => { if (form[k] && typeof c[k] !== "object") form[k].value = c[k]; });
+  document.querySelectorAll("#produtos input").forEach(i => i.checked = (c.produtos || []).includes(i.value));
+  $("#btn-del").style.display = "inline-block";
+  $("#box-hist").style.display = "block";
+  renderHist(c);
+  toggleMotivo();
+  abaAtiva("tab-form");
+  map.closePopup();
+};
+
+function renderHist(c) {
+  $("#hist").innerHTML = (c.interacoes || []).slice().reverse().map(h =>
+    `<div class="hist"><b>${esc(h.data.split("-").reverse().join("/"))} &middot; ${esc(h.tipo)}</b><br>${esc(h.nota)}</div>`).join("") || `<p class="muted">Nenhum contato registrado.</p>`;
+}
+
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  const f = new FormData(form);
+  const dados = Object.fromEntries(f.entries());
+  dados.nome = dados.nome.trim();
+  if (!dados.nome) return;
+  dados.produtos = [...document.querySelectorAll("#produtos input:checked")].map(i => i.value);
+  dados.lat = dados.lat ? parseFloat(String(dados.lat).replace(",", ".")) : "";
+  dados.lng = dados.lng ? parseFloat(String(dados.lng).replace(",", ".")) : "";
+  dados.potencial = Number(String(dados.potencial || "").replace(/\D/g, "")) || "";
+  if (dados.status !== "descartado") dados.motivo = "";
+  dados.atualizado = new Date().toISOString();
+  if (dados.id) {
+    const c = db.clientes.find(x => x.id === dados.id);
+    if (c.status !== dados.status) (c.interacoes = c.interacoes || []).push({ data: hoje(), tipo: "Status", nota: `${st(c.status).nome} → ${st(dados.status).nome}` });
+    Object.assign(c, dados);
+  } else {
+    dados.id = uid(); dados.criado = dados.atualizado; dados.interacoes = []; dados.origem = "manual";
+    db.clientes.push(dados);
+  }
+  salvar(); render();
+  toast("Cliente salvo");
+  if (temGeo(dados)) map.setView([dados.lat, dados.lng], Math.max(map.getZoom(), 15));
+  limparForm(); abaAtiva("tab-mapa");
+});
+
+$("#btn-del").onclick = () => {
+  const id = form.id.value; const c = db.clientes.find(x => x.id === id);
+  if (!c || !confirm(`Excluir "${c.nome}"? Para manter o histórico, prefira o status Descartado.`)) return;
+  db.clientes = db.clientes.filter(x => x.id !== id);
+  rota = rota.filter(x => x !== id);
+  salvar(); render(); limparForm(); abaAtiva("tab-mapa");
+};
+$("#btn-cancel").onclick = () => limparForm();
+form.status.addEventListener("change", toggleMotivo);
+
+$("#btn-hist").onclick = () => {
+  const c = db.clientes.find(x => x.id === form.id.value); if (!c) return;
+  const nota = $("#hist-nota").value.trim(); if (!nota) return;
+  (c.interacoes = c.interacoes || []).push({ data: hoje(), tipo: $("#hist-tipo").value, nota });
+  c.atualizado = new Date().toISOString();
+  $("#hist-nota").value = "";
+  salvar(); renderHist(c); render();
+};
+
+// Geocodificação (Nominatim / OpenStreetMap)
+$("#btn-geo").onclick = async () => {
+  const end = form.endereco.value.trim(); if (!end) return toast("Digite o endereço");
+  const cidade = form.cidade.value || "Fortaleza";
+  const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&addressdetails=1&q=" +
+    encodeURIComponent(`${end}, ${cidade}, Ceará`);
+  try {
+    const r = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
+    const [res] = await r.json();
+    if (!res) return toast("Endereço não encontrado. Marque o ponto no mapa.");
+    form.lat.value = (+res.lat).toFixed(6); form.lng.value = (+res.lon).toFixed(6);
+    const a = res.address || {};
+    if (!form.bairro.value) form.bairro.value = a.suburb || a.neighbourhood || a.city_district || "";
+    map.setView([res.lat, res.lon], 17);
+    toast("Localizado");
+  } catch (e) { toast("Falha na busca de endereço (sem internet?)"); }
+};
+
+async function reverso(lat, lng) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`, { headers: { "Accept-Language": "pt-BR" } });
+    const j = await r.json(); const a = j.address || {};
+    if (!form.endereco.value) form.endereco.value = [a.road, a.house_number].filter(Boolean).join(", ");
+    if (!form.bairro.value) form.bairro.value = a.suburb || a.neighbourhood || a.city_district || "";
+    if (a.city || a.town) form.cidade.value = a.city || a.town;
+  } catch (e) { /* opcional */ }
+}
+
+$("#btn-pick").onclick = () => { modoPick = "cliente"; document.body.classList.add("picking"); toast("Clique no mapa para marcar o local"); };
+$("#btn-base-pick").onclick = () => { modoPick = "base"; document.body.classList.add("picking"); toast("Clique no mapa para marcar a fábrica"); };
+map.on("click", e => {
+  if (!modoPick) return;
+  const { lat, lng } = e.latlng;
+  if (modoPick === "cliente") {
+    form.lat.value = lat.toFixed(6); form.lng.value = lng.toFixed(6);
+    reverso(lat, lng); abaAtiva("tab-form");
+  } else {
+    $("#base-lat").value = lat.toFixed(6); $("#base-lng").value = lng.toFixed(6);
+    salvarBase();
+  }
+  modoPick = null; document.body.classList.remove("picking");
+});
+map.on("contextmenu", e => { // clique direito / toque longo = novo cliente aqui
+  limparForm({ lat: e.latlng.lat.toFixed(6), lng: e.latlng.lng.toFixed(6) });
+  reverso(e.latlng.lat, e.latlng.lng); abaAtiva("tab-form"); form.nome.focus();
+});
+
+// ---------- Fábrica ----------
+function salvarBase() {
+  const lat = parseFloat($("#base-lat").value), lng = parseFloat($("#base-lng").value);
+  if (!isFinite(lat) || !isFinite(lng)) return toast("Coordenadas inválidas");
+  db.base = [lat, lng]; salvar(); desenharBase(); toast("Fábrica salva");
+}
+function desenharBase() {
+  if (baseMarker) map.removeLayer(baseMarker);
+  if (!db.base) return;
+  $("#base-lat").value = db.base[0]; $("#base-lng").value = db.base[1];
+  baseMarker = L.marker(db.base, { icon: L.divIcon({ className: "", iconSize: [30, 30], html: `<div class="pin" style="background:#0f172a; width:30px; height:30px"><span>F</span></div>` }) })
+    .bindPopup("<b>Fábrica / depósito</b>").addTo(map);
+}
+$("#btn-base-save").onclick = salvarBase;
+
+// ---------- Rota ----------
+window.addRota = function (id) {
+  if (!rota.includes(id)) rota.push(id);
+  renderRota(); toast("Adicionado à rota (" + rota.length + ")"); map.closePopup();
+};
+function renderRota() {
+  const cs = rota.map(id => db.clientes.find(c => c.id === id)).filter(Boolean);
+  $("#rota-lista").innerHTML = cs.map((c, i) =>
+    `<li>${esc(c.nome)} <span class="muted">${esc(c.bairro || "")}</span> <a href="#" data-rm-rota="${c.id}">remover</a></li>`).join("") || "<li>Nenhuma parada</li>";
+  rotaLayer.clearLayers();
+  const pts = cs.filter(temGeo).map(c => [+c.lat, +c.lng]);
+  const inicio = $("#rota-inicio").value === "fabrica" && db.base ? [db.base] : [];
+  if (pts.length) L.polyline(inicio.concat(pts), { color: "#0e7490", weight: 4, opacity: .7, dashArray: "6 6" }).addTo(rotaLayer);
+  let km = 0; const all = inicio.concat(pts);
+  for (let i = 1; i < all.length; i++) km += distKm(all[i - 1], all[i]);
+  $("#rota-info").textContent = all.length > 1 ? `${pts.length} paradas, aprox. ${km.toFixed(1)} km em linha reta (no trânsito, conte 1,4x).` : "";
+}
+function pontoInicio() {
+  return new Promise(res => {
+    if ($("#rota-inicio").value === "gps" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(p => res([p.coords.latitude, p.coords.longitude]), () => res(db.base || FORTALEZA), { timeout: 8000 });
+    } else res(db.base || FORTALEZA);
+  });
+}
+$("#rota-ordenar").onclick = async () => {
+  let resto = rota.map(id => db.clientes.find(c => c.id === id)).filter(c => c && temGeo(c));
+  let atual = await pontoInicio(); const ordem = [];
+  while (resto.length) { // vizinho mais próximo
+    resto.sort((a, b) => distKm(atual, [+a.lat, +a.lng]) - distKm(atual, [+b.lat, +b.lng]));
+    const prox = resto.shift(); ordem.push(prox.id); atual = [+prox.lat, +prox.lng];
+  }
+  rota = ordem; renderRota(); toast("Rota otimizada");
+};
+$("#rota-agendados").onclick = () => {
+  const d = $("#rota-data").value || hoje();
+  const max = +$("#rota-max").value || 10;
+  rota = db.clientes.filter(c => c.proximaData === d && temGeo(c) && c.status !== "descartado").slice(0, max).map(c => c.id);
+  renderRota(); toast(`${rota.length} clientes agendados para ${d.split("-").reverse().join("/")}`);
+};
+$("#rota-filtro").onclick = () => {
+  const max = +$("#rota-max").value || 10;
+  rota = filtrados().filter(c => prio(c) === "A" && temGeo(c) && c.status !== "descartado" && c.status !== "fidelizado")
+    .sort((a, b) => score(b) - score(a)).slice(0, max).map(c => c.id);
+  renderRota(); toast(`${rota.length} leads prioridade A`);
+};
+$("#rota-limpar").onclick = () => { rota = []; renderRota(); };
+$("#rota-gmaps").onclick = async () => {
+  const cs = rota.map(id => db.clientes.find(c => c.id === id)).filter(c => c && temGeo(c));
+  if (!cs.length) return toast("Adicione paradas à rota");
+  const ini = await pontoInicio();
+  const p = c => `${c.lat},${c.lng}`;
+  const dest = cs[cs.length - 1], meio = cs.slice(0, -1).slice(0, 9); // Google aceita até 9 paradas intermediárias
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${ini.join(",")}&destination=${p(dest)}&travelmode=driving` +
+    (meio.length ? `&waypoints=${encodeURIComponent(meio.map(p).join("|"))}` : "");
+  window.open(url, "_blank", "noopener");
+};
+$("#rota-inicio").onchange = renderRota;
+document.addEventListener("click", e => {
+  const rm = e.target.closest("[data-rm-rota]");
+  if (rm) { e.preventDefault(); rota = rota.filter(x => x !== rm.dataset.rmRota); renderRota(); }
+});
+
+// ---------- Prospecção OSM (Overpass) ----------
+$("#btn-osm").onclick = async () => {
+  const tipos = [...document.querySelectorAll("#osm-tipos input:checked")].map(i => OSM_TIPOS[+i.value]);
+  if (!tipos.length) return toast("Escolha ao menos um tipo");
+  if (map.getZoom() < 12) return toast("Aproxime mais o mapa (área muito grande)");
+  const b = map.getBounds();
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(n => n.toFixed(4)).join(",");
+  const partes = tipos.flatMap(t => t.filtros.map(f => `nwr${f}(${bbox});`)).join("");
+  const query = `[out:json][timeout:60];(${partes});out center tags;`;
+  $("#osm-info").textContent = "Buscando...";
+  try {
+    let j = null;
+    for (const srv of OVERPASS) { // tenta o servidor principal e depois o espelho
+      try {
+        const r = await fetch(srv, { method: "POST", body: "data=" + encodeURIComponent(query) });
+        if (r.ok) { j = await r.json(); break; }
+      } catch (e) { /* tenta o próximo */ }
+    }
+    if (!j) throw new Error("sem resposta");
+    let novos = 0, repetidos = 0;
+    for (const el of j.elements) {
+      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon, t = el.tags || {};
+      if (lat == null) continue;
+      const osmId = el.type + "/" + el.id;
+      if (db.clientes.some(c => c.osmId === osmId || (c.nome && t.name && c.nome.toLowerCase() === t.name.toLowerCase() && temGeo(c) && distKm([+c.lat, +c.lng], [lat, lng]) < 0.15))) { repetidos++; continue; }
+      const segId = classificarOSM(t);
+      db.clientes.push({
+        id: uid(), osmId, origem: "osm", nome: t.name || t.brand || `${seg(segId).nome} sem nome`,
+        segmento: segId, status: "potencial", motivo: "", rede: t.brand || t.operator || "",
+        endereco: [t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(", "),
+        bairro: t["addr:suburb"] || "", cidade: t["addr:city"] || "Fortaleza",
+        lat: +lat.toFixed(6), lng: +lng.toFixed(6), contato: "", telefone: t.phone || t["contact:phone"] || t["contact:whatsapp"] || "",
+        produtos: [], potencial: "", concorrente: "", proximaAcao: "Primeira visita", proximaData: "",
+        obs: "Importado do OpenStreetMap. Confirmar dados em campo.", interacoes: [],
+        criado: new Date().toISOString(), atualizado: new Date().toISOString()
+      });
+      novos++;
+    }
+    salvar(); render();
+    $("#osm-info").textContent = `${novos} novos leads importados, ${repetidos} já existiam.`;
+  } catch (e) {
+    $("#osm-info").textContent = "Falha ao consultar o OpenStreetMap. Tente de novo em alguns minutos ou numa área menor.";
+  }
+};
+function classificarOSM(t) {
+  if (t.amenity === "fuel") return "posto";
+  if (t.shop === "car_parts") return "autopecas";
+  if (t.shop === "supermarket" || t.shop === "wholesale") return "supermercado";
+  if (t.amenity === "car_wash") return "lavajato";
+  if (t.shop === "batteries" || /electrical|battery/.test(t.car_repair || "")) return "autoeletrica";
+  if (t.shop === "car_repair" || t.craft === "car_repair") return "oficina";
+  return "outro";
+}
+
+// ---------- Importar / exportar ----------
+const CAMPOS = ["id", "nome", "segmento", "status", "motivo", "rede", "endereco", "bairro", "cidade", "lat", "lng",
+  "contato", "telefone", "produtos", "potencial", "concorrente", "proximaAcao", "proximaData", "obs", "origem", "criado", "atualizado"];
+
+function baixar(nome, conteudo, tipo) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$("#btn-exp-json").onclick = () => baixar(`clientes-backup-${hoje()}.json`, JSON.stringify(db, null, 2), "application/json");
+$("#btn-exp-csv").onclick = () => {
+  const cel = v => { v = Array.isArray(v) ? v.join(" | ") : (v ?? ""); v = String(v); return /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const linhas = [CAMPOS.concat(["status_nome", "segmento_nome", "prioridade", "pontos"]).join(";")]
+    .concat(db.clientes.map(c => CAMPOS.map(k => cel(c[k])).concat([cel(st(c.status).nome), cel(seg(c.segmento).nome), prio(c), score(c)]).join(";")));
+  baixar(`clientes-${hoje()}.csv`, "﻿" + linhas.join("\n"), "text/csv;charset=utf-8");
+};
+
+function parseCSV(txt) {
+  txt = txt.replace(/^﻿/, "");
+  const sep = (txt.split("\n")[0].match(/;/g) || []).length >= (txt.split("\n")[0].match(/,/g) || []).length ? ";" : ",";
+  const rows = []; let row = [], cur = "", q = false;
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i];
+    if (q) { if (ch === '"' && txt[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cur); cur = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && txt[i + 1] === "\n") i++; row.push(cur); rows.push(row); row = []; cur = ""; }
+    else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  const head = rows.shift().map(h => h.trim());
+  return rows.filter(r => r.some(v => v.trim())).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || "").trim()])));
+}
+// aceita nomes amigáveis no CSV (ex.: "Fidelizado", "Posto de combustível")
+function normId(valor, lista) {
+  const v = String(valor || "").trim().toLowerCase();
+  const sem = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const achado = lista.find(x => x.id === v || sem(x.nome) === sem(v) || sem(x.nome).startsWith(sem(v)) && v.length > 3);
+  return achado ? achado.id : null;
+}
+$("#file-imp").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const txt = await f.text(); e.target.value = "";
+  try {
+    if (f.name.endsWith(".json")) {
+      const d = JSON.parse(txt);
+      if (!Array.isArray(d.clientes)) throw new Error("formato");
+      if (!confirm(`Substituir a base atual (${db.clientes.length}) pelo backup (${d.clientes.length} clientes)?`)) return;
+      db = d; if (!db.status) db.status = STATUS_PADRAO.slice();
+      filtroStatus = new Set(db.status.map(s => s.id));
+    } else {
+      let n = 0;
+      for (const r of parseCSV(txt)) {
+        if (!r.nome) continue;
+        let stId = normId(r.status, db.status);
+        if (!stId && r.status) { // status novo vindo da planilha vira um tipo novo
+          stId = "st_" + uid(); db.status.push({ id: stId, nome: r.status, cor: "#7c3aed", peso: 0 }); filtroStatus.add(stId);
+        }
+        const c = {
+          ...Object.fromEntries(CAMPOS.map(k => [k, r[k] || ""])),
+          id: r.id && !db.clientes.some(x => x.id === r.id) ? r.id : uid(),
+          segmento: normId(r.segmento, SEGMENTOS) || "outro", status: stId || "potencial",
+          lat: r.lat ? parseFloat(r.lat.replace(",", ".")) : "", lng: r.lng ? parseFloat(r.lng.replace(",", ".")) : "",
+          produtos: r.produtos ? r.produtos.split("|").map(s => s.trim()).filter(Boolean) : [],
+          potencial: Number(String(r.potencial || "").replace(/\D/g, "")) || "",
+          cidade: r.cidade || "Fortaleza", origem: r.origem || "planilha", interacoes: [],
+          criado: r.criado || new Date().toISOString(), atualizado: new Date().toISOString()
+        };
+        db.clientes.push(c); n++;
+      }
+      toast(`${n} clientes importados`);
+    }
+    salvar(); renderChips(); render(); desenharBase();
+  } catch (err) { toast("Arquivo inválido: " + err.message); }
+};
+$("#btn-zerar").onclick = () => {
+  if (!confirm("Apagar TODOS os clientes deste navegador? Faça um backup antes.")) return;
+  if (!confirm("Tem certeza? Não dá para desfazer.")) return;
+  db = { clientes: [], status: STATUS_PADRAO.slice(), base: db.base }; rota = [];
+  salvar(); renderChips(); render(); renderRota();
+};
+
+// ---------- Status personalizados ----------
+$("#btn-add-status").onclick = () => {
+  const nome = $("#novo-status").value.trim(); if (!nome) return;
+  if (db.status.some(s => s.nome.toLowerCase() === nome.toLowerCase())) return toast("Status já existe");
+  const id = "st_" + uid();
+  db.status.push({ id, nome, cor: $("#novo-status-cor").value, peso: 0 });
+  filtroStatus.add(id); $("#novo-status").value = "";
+  salvar(); renderChips(); render();
+};
+$("#status-edit").addEventListener("input", e => {
+  const id = e.target.dataset.cor; if (!id) return;
+  st(id).cor = e.target.value; salvar(); renderChips(); render();
+});
+$("#status-edit").addEventListener("click", e => {
+  const id = e.target.dataset.rm; if (!id) return;
+  const n = db.clientes.filter(c => c.status === id).length;
+  if (n && !confirm(`${n} clientes usam este status e passarão para "Potencial". Continuar?`)) return;
+  db.clientes.forEach(c => { if (c.status === id) c.status = "potencial"; });
+  db.status = db.status.filter(s => s.id !== id);
+  salvar(); renderChips(); render();
+});
+
+// ---------- Eventos gerais ----------
+document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => abaAtiva(b.dataset.tab));
+["#q", "#f-cidade", "#f-prio", "#f-ord"].forEach(s => $(s).addEventListener("input", render));
+$("#f-status").addEventListener("click", e => {
+  const ch = e.target.closest("[data-st]"); if (!ch) return;
+  const id = ch.dataset.st;
+  if (e.detail === 2) { filtroStatus = new Set([id]); } // duplo clique isola
+  else filtroStatus.has(id) ? filtroStatus.delete(id) : filtroStatus.add(id);
+  renderChips(); render();
+});
+$("#f-seg").addEventListener("click", e => {
+  const ch = e.target.closest("[data-seg]"); if (!ch) return;
+  const id = ch.dataset.seg;
+  if (e.detail === 2) { filtroSeg = new Set([id]); }
+  else filtroSeg.has(id) ? filtroSeg.delete(id) : filtroSeg.add(id);
+  renderChips(); render();
+});
+$("#lista").addEventListener("click", e => {
+  const li = e.target.closest("li[data-id]"); if (!li) return;
+  const c = db.clientes.find(x => x.id === li.dataset.id);
+  if (!temGeo(c)) return editar(c.id);
+  map.setView([+c.lat, +c.lng], 17);
+  cluster.eachLayer(m => { const p = m.getLatLng(); if (Math.abs(p.lat - c.lat) < 1e-7 && Math.abs(p.lng - c.lng) < 1e-7) cluster.zoomToShowLayer(m, () => m.openPopup()); });
+});
+$("#btn-novo").onclick = () => { limparForm(); abaAtiva("tab-form"); form.nome.focus(); };
+
+// ---------- Inicialização ----------
+$("#sel-seg").innerHTML = SEGMENTOS.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join("");
+$("#sel-motivo").innerHTML = MOTIVOS.map(m => `<option>${esc(m)}</option>`).join("");
+$("#produtos").innerHTML = PRODUTOS.map(p => `<label><input type="checkbox" value="${esc(p)}"> ${esc(p)}</label>`).join("");
+$("#osm-tipos").innerHTML = OSM_TIPOS.map((t, i) => `<label><input type="checkbox" value="${i}" checked> ${esc(t.rotulo)}</label>`).join("");
+$("#rota-data").value = hoje();
+renderChips(); render(); renderRota(); desenharBase();
+if (!db.clientes.length) toast("Comece em Dados > Prospecção automática, ou clique com o botão direito no mapa para cadastrar.");
+</script>
+</body>
+</html>
