@@ -57,6 +57,16 @@
   .hist { border-left: 2px solid var(--line); padding-left: 8px; margin: 4px 0; font-size: 12px; }
   .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; }
   .pin span { transform: rotate(45deg); color: #fff; font-weight: 700; font-size: 11px; }
+  .pin.A { border-width: 3px; box-shadow: 0 0 0 4px rgba(250, 204, 21, .9), 0 2px 8px rgba(0,0,0,.5); }
+  .pin.A span { font-size: 15px; }
+  .pin.C { opacity: .8; border-width: 1px; }
+  .pin.C span { font-size: 9px; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .tag { font-size: 11px; padding: 0 6px; border-radius: 4px; background: #f1f5f9; color: #334155; }
+  .tag.forte { background: #fef3c7; color: #92400e; font-weight: 600; }
+  ul.list li.A { border-color: #facc15; background: #fffbeb; }
+  ul.list li.A b { font-size: 15px; }
+  ul.list li.C { opacity: .8; }
   .legend { background: #fff; padding: 8px 10px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 12px; line-height: 1.5; }
   #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1d2733; color: #fff; padding: 8px 14px; border-radius: 6px; display: none; z-index: 2000; }
   .picking #map { cursor: crosshair; }
@@ -121,6 +131,12 @@
         </div>
         <label>Rede / grupo (se fizer parte de uma)</label>
         <input name="rede" placeholder="Ex.: rede de postos, rede de supermercados">
+        <div class="row">
+          <div><label>Porte da loja</label><select name="porte"><option value="">Não avaliado</option><option value="grande">Grande</option><option value="medio">Médio</option><option value="pequeno">Pequeno</option></select></div>
+          <div><label>Fluxo de clientes / veículos</label><select name="fluxo"><option value="">Não avaliado</option><option value="alto">Alto</option><option value="medio">Médio</option><option value="baixo">Baixo</option></select></div>
+        </div>
+        <label>Nº de lojas (se for rede)</label>
+        <input name="lojas" inputmode="numeric" placeholder="1">
         <label>Endereço</label>
         <div style="display:flex; gap:6px">
           <input name="endereco" id="endereco" placeholder="Rua, número, bairro">
@@ -170,7 +186,7 @@
 
     <!-- Rota -->
     <section id="tab-rota" class="tab">
-      <div class="hint">Monte a rota de visitas do dia: escolha os clientes (ou use os agendados para a data), defina o ponto de partida e o sistema ordena pelo caminho mais curto aproximado. Depois abra no Google Maps.</div>
+      <div class="hint">Monte a rota de visitas do dia: escolha os clientes, use os agendados para a data ou as maiores contas (prioridade A primeiro, depois B), defina o ponto de partida e o sistema ordena pelo caminho mais curto aproximado. Depois abra no Google Maps.</div>
       <div class="row">
         <div><label>Data das visitas</label><input type="date" id="rota-data"></div>
         <div><label>Máx. de paradas</label><input type="number" id="rota-max" value="10" min="2" max="25"></div>
@@ -182,7 +198,7 @@
       </select>
       <div class="btns">
         <button class="btn" id="rota-agendados">Usar agendados da data</button>
-        <button class="btn" id="rota-filtro">Usar prioridade A do filtro atual</button>
+        <button class="btn" id="rota-filtro">Usar as maiores contas do filtro</button>
       </div>
       <h3>Paradas</h3>
       <ol id="rota-lista" class="muted"></ol>
@@ -243,7 +259,7 @@ const FORTALEZA = [-3.7319, -38.5267];
 const KEY = "mapaClientesFortaleza.v1";
 
 const SEGMENTOS = [
-  { id: "autopecas",   nome: "Loja de autopeças",      letra: "A", peso: 30 },
+  { id: "autopecas",   nome: "Loja de autopeças",      letra: "Pç", peso: 30 },
   { id: "posto",       nome: "Posto de combustível",   letra: "P", peso: 25 },
   { id: "oficina",     nome: "Oficina mecânica",       letra: "O", peso: 20 },
   { id: "supermercado",nome: "Supermercado / rede",    letra: "S", peso: 30 },
@@ -315,16 +331,27 @@ function distKm(a, b) {
 }
 const temGeo = c => isFinite(parseFloat(c.lat)) && isFinite(parseFloat(c.lng));
 
-// Pontuação de prioridade: segmento + potencial + status + rede + agenda
+// Pontuação de prioridade: o que mais pesa é o tamanho da conta
+// (potencial em R$, porte da loja, fluxo e número de lojas da rede).
+const PORTE = { grande: 20, medio: 10, pequeno: 0 };
+const FLUXO = { alto: 20, medio: 10, baixo: 0 };
+const NOME_PORTE = { grande: "Grande", medio: "Médio", pequeno: "Pequeno" };
+const NOME_FLUXO = { alto: "Fluxo alto", medio: "Fluxo médio", baixo: "Fluxo baixo" };
+const BONUS_STATUS = { potencial: 5, negociacao: 10, ativo: 8, fidelizado: 3 };
 function score(c) {
-  let s = seg(c.segmento).peso + st(c.status).peso;
-  s += Math.min(30, (Number(c.potencial) || 0) / 100);   // até 30 pts (R$ 3.000/mês)
-  if (c.rede) s += 10;                                    // redes multiplicam o pedido
-  if (c.proximaData && c.proximaData <= hoje()) s += 10;  // ação vencida ou do dia
+  let s = seg(c.segmento).peso / 2;                       // até 17 pts
+  s += Math.min(40, (Number(c.potencial) || 0) / 100);   // até 40 pts (R$ 4.000/mês ou mais)
+  s += PORTE[c.porte] || 0;                               // até 20 pts
+  s += FLUXO[c.fluxo] || 0;                               // até 20 pts
+  const lojas = Number(c.lojas) || 0;
+  if (lojas > 1) s += Math.min(15, lojas * 2);            // rede: um "sim" abre várias lojas
+  else if (c.rede) s += 5;
+  s += BONUS_STATUS[c.status] || 0;
+  if (c.proximaData && c.proximaData <= hoje()) s += 5;   // ação vencida ou do dia
   if (c.status === "descartado") s = Math.min(s, 5);
   return Math.round(s);
 }
-const prio = c => { const s = score(c); return s >= 60 ? "A" : s >= 40 ? "B" : "C"; };
+const prio = c => { const s = score(c); return s >= 60 ? "A" : s >= 35 ? "B" : "C"; };
 
 // ---------- Mapa ----------
 const map = L.map("map", { zoomControl: true }).setView(FORTALEZA, 12);
@@ -333,6 +360,8 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 const cluster = L.markerClusterGroup({ maxClusterRadius: 40, disableClusteringAtZoom: 16 });
 map.addLayer(cluster);
+const destaque = L.layerGroup().addTo(map); // prioridade A: nunca agrupada
+const marcadores = new Map();
 const rotaLayer = L.layerGroup().addTo(map);
 let baseMarker = null;
 
@@ -340,12 +369,21 @@ const legenda = L.control({ position: "bottomright" });
 legenda.onAdd = () => { const d = L.DomUtil.create("div", "legend"); d.id = "legenda"; return d; };
 legenda.addTo(map);
 
+const TAM = { A: 40, B: 28, C: 18 };
 function icone(c) {
-  const s = st(c.status);
+  const s = st(c.status), p = prio(c), t = TAM[p];
   return L.divIcon({
-    className: "", iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -24],
-    html: `<div class="pin" style="background:${s.cor}"><span>${esc(seg(c.segmento).letra)}</span></div>`
+    className: "", iconSize: [t, t], iconAnchor: [t / 2, t], popupAnchor: [0, -t + 2],
+    html: `<div class="pin ${p}" style="background:${s.cor}; width:${t}px; height:${t}px"><span>${esc(seg(c.segmento).letra)}</span></div>`
   });
+}
+function tags(c) {
+  const t = [];
+  if (c.potencial) t.push([brl(c.potencial) + "/mês", Number(c.potencial) >= 2000]);
+  if (c.porte) t.push([NOME_PORTE[c.porte], c.porte === "grande"]);
+  if (c.fluxo) t.push([NOME_FLUXO[c.fluxo], c.fluxo === "alto"]);
+  if (Number(c.lojas) > 1) t.push([c.lojas + " lojas", true]);
+  return t.length ? `<div class="tags">${t.map(([n, f]) => `<span class="tag ${f ? "forte" : ""}">${esc(n)}</span>`).join("")}</div>` : "";
 }
 
 function popup(c) {
@@ -355,7 +393,7 @@ function popup(c) {
     <span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)}${c.status === "descartado" && c.motivo ? " &middot; " + esc(c.motivo) : ""}<br>
     ${esc(seg(c.segmento).nome)}${c.rede ? " &middot; Rede: " + esc(c.rede) : ""}<br>
     ${c.endereco ? esc(c.endereco) + "<br>" : ""}
-    Prioridade <b>${prio(c)}</b> (${score(c)} pts)${c.potencial ? " &middot; " + brl(c.potencial) + "/mês" : ""}<br>
+    Prioridade <b>${prio(c)}</b> (${score(c)} pts)${tags(c)}
     ${c.proximaAcao ? "Próxima: " + esc(c.proximaAcao) + (c.proximaData ? " em " + esc(c.proximaData.split("-").reverse().join("/")) : "") + "<br>" : ""}
     <div class="btns">
       <button class="btn small" onclick="editar('${c.id}')">Editar</button>
@@ -383,17 +421,21 @@ function render() {
     ord === "atualizado" ? (b.atualizado || "").localeCompare(a.atualizado || "") :
     score(b) - score(a));
 
-  cluster.clearLayers();
+  cluster.clearLayers(); destaque.clearLayers(); marcadores.clear();
   lista.filter(temGeo).forEach(c => {
-    L.marker([+c.lat, +c.lng], { icon: icone(c) }).bindPopup(() => popup(c)).addTo(cluster);
+    const p = prio(c);
+    const m = L.marker([+c.lat, +c.lng], { icon: icone(c), zIndexOffset: p === "A" ? 1000 + score(c) : p === "B" ? 500 : 0 })
+      .bindPopup(() => popup(c)).addTo(p === "A" && c.status !== "descartado" ? destaque : cluster);
+    marcadores.set(c.id, m);
   });
 
   const ul = $("#lista");
   ul.innerHTML = lista.slice(0, 300).map(c => {
     const s = st(c.status);
     const atrasado = c.proximaData && c.proximaData < hoje() && c.status !== "descartado";
-    return `<li data-id="${c.id}">
+    return `<li data-id="${c.id}" class="${prio(c)}">
       <div class="li-top"><b>${esc(c.nome)}</b><span class="prio ${prio(c)}">${prio(c)}</span></div>
+      ${tags(c)}
       <div class="muted"><span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)} &middot; ${esc(seg(c.segmento).nome)}${c.bairro ? " &middot; " + esc(c.bairro) : ""}</div>
       ${c.proximaAcao ? `<div class="muted" style="${atrasado ? "color:#b91c1c" : ""}">${atrasado ? "Atrasado: " : ""}${esc(c.proximaAcao)} ${c.proximaData ? esc(c.proximaData.split("-").reverse().join("/")) : ""}</div>` : ""}
       ${temGeo(c) ? "" : `<div class="muted" style="color:#b91c1c">Sem localização no mapa</div>`}
@@ -411,7 +453,8 @@ function render() {
     [brl(ativos.reduce((t, c) => t + (Number(c.potencial) || 0), 0)), "carteira/mês"], [atrasados, "ações atrasadas"]
   ].map(([n, t]) => `<div class="stat"><b>${n}</b><span>${t}</span></div>`).join("");
 
-  $("#legenda").innerHTML = db.status.map(s => `<div><span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)} (${conta(s.id)})</div>`).join("");
+  $("#legenda").innerHTML = db.status.map(s => `<div><span class="dot" style="background:${s.cor}"></span> ${esc(s.nome)} (${conta(s.id)})</div>`).join("")
+    + `<div class="muted">Pino maior = conta maior</div>`;
 
   const cidades = [...new Set(db.clientes.map(c => c.cidade).filter(Boolean))].sort();
   const sel = $("#f-cidade"), atual = sel.value;
@@ -493,6 +536,7 @@ form.addEventListener("submit", e => {
   dados.lat = dados.lat ? parseFloat(String(dados.lat).replace(",", ".")) : "";
   dados.lng = dados.lng ? parseFloat(String(dados.lng).replace(",", ".")) : "";
   dados.potencial = Number(String(dados.potencial || "").replace(/\D/g, "")) || "";
+  dados.lojas = Number(String(dados.lojas || "").replace(/\D/g, "")) || "";
   if (dados.status !== "descartado") dados.motivo = "";
   dados.atualizado = new Date().toISOString();
   if (dados.id) {
@@ -631,9 +675,9 @@ $("#rota-agendados").onclick = () => {
 };
 $("#rota-filtro").onclick = () => {
   const max = +$("#rota-max").value || 10;
-  rota = filtrados().filter(c => prio(c) === "A" && temGeo(c) && c.status !== "descartado" && c.status !== "fidelizado")
+  rota = filtrados().filter(c => prio(c) !== "C" && temGeo(c) && c.status !== "descartado" && c.status !== "fidelizado")
     .sort((a, b) => score(b) - score(a)).slice(0, max).map(c => c.id);
-  renderRota(); toast(`${rota.length} leads prioridade A`);
+  renderRota(); toast(`${rota.length} maiores contas na rota`);
 };
 $("#rota-limpar").onclick = () => { rota = []; renderRota(); };
 $("#rota-gmaps").onclick = async () => {
@@ -684,6 +728,7 @@ $("#btn-osm").onclick = async () => {
         endereco: [t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(", "),
         bairro: t["addr:suburb"] || "", cidade: t["addr:city"] || "Fortaleza",
         lat: +lat.toFixed(6), lng: +lng.toFixed(6), contato: "", telefone: t.phone || t["contact:phone"] || t["contact:whatsapp"] || "",
+        porte: t.brand && (segId === "supermercado" || segId === "posto") ? "medio" : "", fluxo: "",
         produtos: [], potencial: "", concorrente: "", proximaAcao: "Primeira visita", proximaData: "",
         obs: "Importado do OpenStreetMap. Confirmar dados em campo.", interacoes: [],
         criado: new Date().toISOString(), atualizado: new Date().toISOString()
@@ -707,7 +752,7 @@ function classificarOSM(t) {
 }
 
 // ---------- Importar / exportar ----------
-const CAMPOS = ["id", "nome", "segmento", "status", "motivo", "rede", "endereco", "bairro", "cidade", "lat", "lng",
+const CAMPOS = ["id", "nome", "segmento", "status", "motivo", "rede", "porte", "fluxo", "lojas", "endereco", "bairro", "cidade", "lat", "lng",
   "contato", "telefone", "produtos", "potencial", "concorrente", "proximaAcao", "proximaData", "obs", "origem", "criado", "atualizado"];
 
 function baixar(nome, conteudo, tipo) {
@@ -746,6 +791,11 @@ function normId(valor, lista) {
   const achado = lista.find(x => x.id === v || sem(x.nome) === sem(v) || sem(x.nome).startsWith(sem(v)) && v.length > 3);
   return achado ? achado.id : null;
 }
+// "Grande", "médio", "Alto" etc. viram as chaves internas
+function normNivel(v, tabela) {
+  const k = String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  return k in tabela ? k : "";
+}
 $("#file-imp").onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   const txt = await f.text(); e.target.value = "";
@@ -771,6 +821,8 @@ $("#file-imp").onchange = async e => {
           lat: r.lat ? parseFloat(r.lat.replace(",", ".")) : "", lng: r.lng ? parseFloat(r.lng.replace(",", ".")) : "",
           produtos: r.produtos ? r.produtos.split("|").map(s => s.trim()).filter(Boolean) : [],
           potencial: Number(String(r.potencial || "").replace(/\D/g, "")) || "",
+          porte: normNivel(r.porte, PORTE), fluxo: normNivel(r.fluxo, FLUXO),
+          lojas: Number(String(r.lojas || "").replace(/\D/g, "")) || "",
           cidade: r.cidade || "Fortaleza", origem: r.origem || "planilha", interacoes: [],
           criado: r.criado || new Date().toISOString(), atualizado: new Date().toISOString()
         };
@@ -831,8 +883,10 @@ $("#lista").addEventListener("click", e => {
   const li = e.target.closest("li[data-id]"); if (!li) return;
   const c = db.clientes.find(x => x.id === li.dataset.id);
   if (!temGeo(c)) return editar(c.id);
-  map.setView([+c.lat, +c.lng], 17);
-  cluster.eachLayer(m => { const p = m.getLatLng(); if (Math.abs(p.lat - c.lat) < 1e-7 && Math.abs(p.lng - c.lng) < 1e-7) cluster.zoomToShowLayer(m, () => m.openPopup()); });
+  const m = marcadores.get(c.id);
+  if (!m) return;
+  if (cluster.hasLayer(m)) cluster.zoomToShowLayer(m, () => m.openPopup());
+  else { map.setView([+c.lat, +c.lng], 17); m.openPopup(); }
 });
 $("#btn-novo").onclick = () => { limparForm(); abaAtiva("tab-form"); form.nome.focus(); };
 

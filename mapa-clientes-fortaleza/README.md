@@ -17,17 +17,20 @@ Para usar no celular da equipe, publique a pasta em qualquer hospedagem estátic
 ## O que faz
 
 - **Mapa por status:** cada cliente é um pino colorido pelo status e com a letra
-  do segmento (A autopeças, P posto, O oficina, S supermercado, E auto elétrica,
+  do segmento (Pç autopeças, P posto, O oficina, S supermercado, E auto elétrica,
   L lava-jato, D distribuidor, F frota).
 - **Status:** Potencial, Em negociação, Ativo (não fidelizado), Fidelizado,
   Descartado (com motivo obrigatório) e quantos tipos novos você criar.
 - **Cadastro completo:** rede, endereço com busca no mapa, contato, WhatsApp,
   produtos de interesse, potencial em R$/mês, concorrente, próxima ação e data,
   histórico de contatos.
-- **Prioridade A/B/C automática** por segmento, potencial, status, rede e agenda.
+- **Prioridade A/B/C automática**, puxada principalmente pelo tamanho da conta:
+  potencial em R$/mês, porte da loja, fluxo e número de lojas da rede. As
+  contas A aparecem com pino grande e destacado, sempre visíveis; as C, com pino
+  pequeno.
 - **Prospecção automática:** importa do OpenStreetMap postos, autopeças, oficinas,
   auto elétricas, lava-jatos e supermercados da área visível como leads.
-- **Rota do dia:** escolhe agendados ou leads A, ordena pelo caminho mais curto e
+- **Rota do dia:** escolhe agendados ou as maiores contas, ordena pelo caminho mais curto e
   abre no Google Maps.
 - **Filtros** por status, segmento, cidade, prioridade e busca livre.
 - **Importação e exportação:** CSV (abre no Excel) e backup JSON.
@@ -39,7 +42,8 @@ Para usar no celular da equipe, publique a pasta em qualquer hospedagem estátic
 
 ## Importar planilha
 
-Use `modelo-importacao.csv` (separador `;`). As colunas `segmento` e `status`
+Use `modelo-importacao.csv` (separador `;`). As colunas `segmento`, `status`,
+`porte` (Grande, Médio, Pequeno) e `fluxo` (Alto, Médio, Baixo)
 aceitam os nomes por extenso ("Posto de combustível", "Fidelizado"). Um status
 desconhecido vira um tipo novo automaticamente. Produtos separados por `|`.
 Linhas sem `lat`/`lng` entram na lista marcadas "Sem localização": abra o

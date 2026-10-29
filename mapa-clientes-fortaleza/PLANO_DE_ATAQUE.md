@@ -59,17 +59,40 @@ Os eixos acima são ponto de partida. Depois de 2 semanas, use o filtro por segm
 
 Prioridade de entrada: **corredores de rodovia e grandes avenidas** (BR-116, BR-222, BR-020, CE-040, Anel Viário). Ali estão postos com alto fluxo, oficinas de caminhão e frotas, que consomem aditivo e água desmineralizada em volume.
 
-## 5. Priorização: quem visitar primeiro
+## 5. Priorização: as maiores contas primeiro
 
-O sistema calcula a prioridade (A, B, C) somando:
+Regra da equipe: **o tempo de visita vai primeiro para quem tem maior potencial, as maiores lojas e as de maior fluxo.** As pequenas são atendidas na sobra da rota ou por distribuidor parceiro.
 
-- **Peso do segmento:** distribuidor 35, autopeças 30, supermercado 30, posto 25, frota 25, auto elétrica 22, oficina 20, lava-jato 12;
-- **Status:** em negociação pesa mais que potencial (já está quente); descartado vai para o fim;
-- **Potencial em R$/mês** informado pelo vendedor (até 30 pontos);
-- **Faz parte de rede:** +10 (um "sim" abre várias lojas);
-- **Ação vencida ou do dia:** +10.
+O sistema calcula a prioridade (A, B, C) e o peso está concentrado no tamanho da conta:
 
-Na aba *Rota*, "Usar prioridade A do filtro atual" monta a rota do dia com os melhores leads do setor, e "Otimizar ordem" encurta o trajeto.
+| Critério | Pontos |
+|---|---|
+| Potencial em R$/mês informado pelo vendedor | até 40 (R$ 100 = 1 ponto, teto em R$ 4.000/mês) |
+| Porte da loja | Grande 20, Médio 10, Pequeno 0 |
+| Fluxo de clientes / veículos | Alto 20, Médio 10, Baixo 0 |
+| Rede com várias lojas | 2 por loja, até 15 (rede sem nº informado: 5) |
+| Segmento | metade do peso: distribuidor 17, autopeças e supermercado 15, posto e frota 12, auto elétrica 11, oficina 10, lava-jato 6 |
+| Status e agenda | em negociação 10, ativo 8, potencial 5, fidelizado 3; ação vencida ou do dia +5; descartado vai para o fim |
+
+**A** = 60 pontos ou mais, **B** = 35 a 59, **C** = abaixo de 35.
+
+No mapa, a prioridade aparece no tamanho do pino:
+
+- **A:** pino grande com contorno amarelo, sempre visível (nunca fica escondido dentro de um agrupamento) e por cima dos outros;
+- **B:** pino médio;
+- **C:** pino pequeno e mais apagado.
+
+Na lista, as contas A ficam destacadas em amarelo, com etiquetas de potencial, porte, fluxo e número de lojas.
+
+**Como avaliar porte e fluxo na 1ª visita** (leva 2 minutos e muda a prioridade):
+
+- *Porte grande:* autopeças com vários balcões ou depósito; posto com muitas bombas, troca de óleo e loja de conveniência; supermercado com seção automotiva; oficina com vários elevadores.
+- *Fluxo alto:* fica em avenida ou rodovia movimentada, tem fila ou movimento constante no horário de pico, atende frotas ou caminhões.
+- Pergunte e anote o **potencial**: "quanto o senhor vende de aditivo e água desmineralizada por mês?"
+
+Leads importados do OpenStreetMap entram sem avaliação. Postos e supermercados de marca conhecida entram como porte médio. **Avalie primeiro os que ficam nos grandes corredores**: é ali que estão as contas A.
+
+Na aba *Rota*, "Usar as maiores contas do filtro" monta a rota do dia com as contas A do setor e completa com as B. Depois, "Otimizar ordem" encurta o trajeto.
 
 ## 6. Estratégia por canal
 

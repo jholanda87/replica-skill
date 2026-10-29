@@ -1,4 +1,4 @@
-nome;segmento;status;motivo;rede;endereco;bairro;cidade;lat;lng;contato;telefone;produtos;potencial;concorrente;proximaAcao;proximaData;obs
-EXEMPLO Autopeças (apague esta linha);Loja de autopeças;Potencial;;;Av. Bezerra de Menezes, 1000;São Gerardo;Fortaleza;;;Nome do comprador;85999999999;Água desmineralizada | Aditivo radiador concentrado;1500;Marca X;Primeira visita;2026-11-05;Linha de exemplo
-EXEMPLO Posto (apague esta linha);Posto de combustível;Em negociação;;Rede Y;;Messejana;Fortaleza;;;Gerente;;Aditivo radiador pronto uso;800;;Levar amostra;2026-11-06;
-EXEMPLO Descartado (apague esta linha);Oficina mecânica;Descartado;Preço;;;Parangaba;Fortaleza;;;;;;;;;;
+nome;segmento;status;motivo;rede;porte;fluxo;lojas;endereco;bairro;cidade;lat;lng;contato;telefone;produtos;potencial;concorrente;proximaAcao;proximaData;obs
+EXEMPLO Autopeças (apague esta linha);Loja de autopeças;Potencial;;;Grande;Alto;1;Av. Bezerra de Menezes, 1000;São Gerardo;Fortaleza;;;Nome do comprador;85999999999;Água desmineralizada | Aditivo radiador concentrado;1500;Marca X;Primeira visita;2026-11-05;Linha de exemplo
+EXEMPLO Posto (apague esta linha);Posto de combustível;Em negociação;;Rede Y;Médio;Alto;6;;Messejana;Fortaleza;;;Gerente;;Aditivo radiador pronto uso;800;;Levar amostra;2026-11-06;
+EXEMPLO Descartado (apague esta linha);Oficina mecânica;Descartado;Preço;;Pequeno;Baixo;;;Parangaba;Fortaleza;;;;;;;;;;
